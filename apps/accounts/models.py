@@ -1,15 +1,20 @@
 import hashlib
 import secrets
+import string
 from datetime import timedelta
-
+import random
 from django.conf import settings
-from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.contrib.auth.models import (
+    AbstractBaseUser,
+    BaseUserManager,
+    PermissionsMixin
+)
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-
 from apps.accounts.enums import Language, NameTitleChoices
 from apps.accounts.utils import profile_image_upload_path
+from apps.common.models import CreatedAtUpdatedAtBaseModel
 from apps.common.phone import normalize_bd_phone
 
 
@@ -55,7 +60,7 @@ class UserManager(BaseUserManager):
         return self.create_user(email=email, password=password, **extra)
 
 
-class User(AbstractBaseUser, PermissionsMixin):
+class User(AbstractBaseUser, PermissionsMixin, CreatedAtUpdatedAtBaseModel):
     phone = models.CharField(max_length=16, unique=True)
     email = models.EmailField(unique=True, null=True, blank=True)
     title = models.CharField(max_length=64, choices=NameTitleChoices.choices, blank=True, null=True)
@@ -109,6 +114,33 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def get_short_name(self):
         return self.first_name
+
+
+class EmailVerification(CreatedAtUpdatedAtBaseModel):
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="email_verification"
+    )
+    code = models.CharField(max_length=6)
+    is_verified = models.BooleanField(default=False)
+    expires_at = models.DateTimeField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.pk:
+            self.expires_at = timezone.now() + timedelta(minutes=2)
+        super().save(*args, **kwargs)
+
+    def is_expired(self):
+        if not self.expires_at:
+            return True
+        return timezone.now() > self.expires_at
+
+    def generate_code(self):
+        self.code = "".join(random.choices(string.digits, k=6))
+        self.save()
+
+    @staticmethod
+    def make_code():
+        return "".join(random.choices(string.digits, k=6))
 
 
 def _hash(code: str) -> str:
