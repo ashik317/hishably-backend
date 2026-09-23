@@ -1,78 +1,59 @@
-# Hishably — backend
+# Hishably
 
-Credit (baki) management for wholesalers and distributors in Bangladesh.
-Django 5 + Django REST Framework, PostgreSQL, Redis, Celery.
+**Digital credit ledger for wholesalers and distributors in Bangladesh.**
 
-## Run it (Windows, PyCharm terminal)
+Most wholesalers still track credit (*baki*) in paper notebooks. Old dues get lost, sales reps collect cash with no clear record, and money gets stuck in the market.
 
-```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-copy .env.example .env          # leave DB_NAME empty to use SQLite at first
-python manage.py migrate
-python manage.py seed_demo      # demo business with 12 shops, 3 reps, 2 months of history
-python manage.py createsuperuser  # optional, for /admin (log in with phone)
-python manage.py runserver
-```
+Hishably replaces the paper *baki khata*. Wholesalers record every credit sale and payment, remind shops by SMS in Bangla, track what their sales reps collect, and always know how much money is owed to them.
 
-- API docs (Swagger): http://127.0.0.1:8000/api/docs/
-- Admin: http://127.0.0.1:8000/admin/
-- Tests: `pytest`
+This repository contains the backend API.
 
-With Docker (PostgreSQL + Redis + Celery worker + beat): `docker compose up --build`,
-then `docker compose exec web python manage.py seed_demo`.
+## Features
 
-## Log in (dev)
+- **Phone login:** sign in with a mobile number and a one-time code
+- **Multiple businesses:** one person can work in several businesses
+- **Staff roles:** owner, manager, sales rep and accountant
+- **Shops and areas:** group shops by route and set a credit limit for each
+- **Ledger:** credit sales, payments, returns and discounts with a running balance
+- **Payment methods:** cash, bKash, Nagad, bank transfer and cheque
+- **Credit limit warning:** alerts when a sale goes over a shop's limit
+- **Field collection:** daily rep routes, shop visits and end-of-day cash handover
+- **SMS reminders:** automatic Bangla reminders before and after the due date
+- **Shop link:** a secure page where a shop can see its own due
+- **Reports:** dashboard, due aging and rep performance
 
-1. `POST /api/v1/auth/otp/send/` with `{"phone": "01711-000111"}`. In dev (`OTP_DEBUG=True`) the code
-   comes back as `debug_code` and is printed in the console.
-2. `POST /api/v1/auth/otp/verify/` with `{"phone": "01711-000111", "code": "123456"}` → `access` + `refresh`.
-3. Send `Authorization: Bearer <access>` on every request.
-4. `GET /api/v1/businesses/` → take the `alias`. All business endpoints are under `/api/v1/b/<alias>/`.
+## How money stays correct
 
-## Apps
+- Every entry is saved safely, even when two people record at the same time
+- Entries are never edited or deleted; mistakes are fixed with a reversal
+- The same entry is never saved twice
+- Every change is recorded with who made it and when
+- Balances are rechecked every night
 
-| App | What it does |
+## Roles
+
+| Role | Access |
 | --- | --- |
-| `accounts` | Phone-number user, OTP login (hashed codes, 5-minute expiry, 5 attempts), JWT |
-| `businesses` | Business (tenant), memberships, roles: owner / manager / rep / accountant |
-| `common` | Base models, BD phone validation, `BusinessScopedMixin` (tenant isolation), `seed_demo` |
-| `shops` | Areas/routes, shops, credit limits, status filters, share links |
-| `ledger` | Append-only `LedgerEntry`, `services.post_entry` / `reverse_entry`, audit log, public ledger |
-| `collections` | Rep route, visits (with payment), end-of-day cash handover + confirmation |
-| `notifications` | Bangla SMS templates, SMS log, reminder rules, provider interface, Celery tasks |
-| `reports` | Dashboard, aging report, rep performance |
+| Owner | Full access |
+| Manager | Shops, entries, reps and reports |
+| Sales rep | Only shops in their own areas |
+| Accountant | View only |
 
-## Money rules (don't break these)
+Each business's data is completely private from other businesses.
 
-- Every change to money goes through `apps/ledger/services.py`.
-- Posting locks the shop row (`select_for_update`) inside `transaction.atomic()`.
-- Entries are never edited or deleted. Mistakes are fixed with a reversal entry (`POST entries/<id>/reverse/`).
-- `Idempotency-Key` header on `POST entries/` stops double posting on retries.
-- `Shop.current_balance` is a cache. The nightly `recalc_balances` task rebuilds it from the ledger and logs mismatches.
-- Reps cannot push a shop over its credit limit; owners and managers can (that counts as approval).
+## Tech stack
 
-## Endpoints (all under `/api/v1/`)
+- Django and Django REST Framework
+- PostgreSQL
+- Celery and Redis
+- JWT authentication
+- Docker
 
-| Screen in the design | Endpoint |
-| --- | --- |
-| Login | `auth/otp/send/`, `auth/otp/verify/`, `auth/token/refresh/`, `auth/me/` |
-| Business switcher / Settings | `businesses/`, `b/<alias>/` |
-| Staff & roles | `b/<alias>/members/`, `b/<alias>/members/<id>/` |
-| Dashboard | `b/<alias>/dashboard/?days=14` |
-| Shops | `b/<alias>/areas/`, `b/<alias>/shops/?status=overdue&area=1&search=rahman&ordering=-current_balance` |
-| Shop detail | `b/<alias>/shops/<shop>/`, `b/<alias>/shops/<shop>/ledger/` |
-| New entry / Reverse | `b/<alias>/entries/` (GET, POST), `b/<alias>/entries/<id>/reverse/` |
-| Share ledger | `b/<alias>/shops/<shop>/share-links/`, public: `public/ledger/<token>/` |
-| Collections | `b/<alias>/reps/me/route/`, `b/<alias>/visits/`, `b/<alias>/handovers/`, `b/<alias>/handovers/<id>/confirm/` |
-| Reports | `b/<alias>/reports/aging/`, `b/<alias>/reports/reps/` |
-| Reminders & SMS | `b/<alias>/shops/<shop>/remind/`, `b/<alias>/sms/`, `b/<alias>/sms/templates/`, `b/<alias>/reminder-rules/` |
+## Roadmap
 
-## Not built yet (next steps)
-
-- Real SMS gateway: fill in `HttpSmsProvider` in `apps/notifications/providers.py` and set `SMS_PROVIDER=http`.
-- bKash / Nagad / SSLCommerz payments + webhooks (`payments` app).
-- Subscription billing and plan limits (`billing` app).
-- AI voice entry, Bangla Q&A, risk scores (`ai` app).
-- Next.js frontend (see `hishably-design.html` for every screen).
+- [ ] SMS gateway
+- [ ] bKash, Nagad and SSLCommerz payments
+- [ ] Subscription plans
+- [ ] AI voice entry in Bangla
+- [ ] Shop risk scores
+- [ ] Web and mobile apps
