@@ -13,3 +13,5 @@ gunicorn>=22.0
 pytest>=8.2
 pytest-django>=4.8
 Pillow>=10.3
+django-autoslug>=1.9
+easy-thumbnails>=2.9

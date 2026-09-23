@@ -11,28 +11,38 @@ SECRET_KEY = config("SECRET_KEY")
 DEBUG = config("DEBUG", default=True, cast=bool)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1", cast=Csv())
 
-# Apps
-INSTALLED_APPS = [
+# App
+DJANGO_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+]
+
+THIRD_PARTY_APPS = [
     "rest_framework",
+    "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
     "django_filters",
     "drf_spectacular",
     "corsheaders",
-    "apps.common",
-    "apps.accounts",
-    "apps.businesses",
-    "apps.shops",
-    "apps.ledger",
-    "apps.collections",
-    "apps.notifications",
-    "apps.reports",
+    "easy_thumbnails",
 ]
+
+PROJECT_APPS = [
+    "apps.common.apps.CommonConfig",
+    "apps.accounts.apps.AccountsConfig",
+    "apps.businesses.apps.BusinessesConfig",
+    "apps.shops.apps.ShopsConfig",
+    "apps.ledger.apps.LedgerConfig",
+    "apps.collections.apps.CollectionsConfig",
+    "apps.notifications.apps.NotificationsConfig",
+    "apps.reports.apps.ReportsConfig",
+]
+
+INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PROJECT_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
